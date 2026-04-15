@@ -11,6 +11,7 @@ export const proxyService = async (req, res) => {
     const organization = user?.organization || null;
 
     if (user && organization && !organization.activeServices.includes(serviceId)) {
+        console.log(`[DEBUG] 403 REJECTED: Service ${serviceId} not in [${organization.activeServices}]`);
         return res.status(403).json({ error: `Service '${serviceId}' not active for your organization.` });
     }
 
@@ -116,10 +117,12 @@ export const getHistory = async (req, res) => {
 
 export const getFacturasSat = async (req, res) => {
     try {
+        console.log('[DEBUG] Inside getFacturasSat controller');
         const { organization } = req.user;
         const mongoUri = organization?.databaseConfig?.mongoUri;
 
         if (!mongoUri) {
+            console.log('[DEBUG] 400 ERROR: No mongoUri for organization', organization?.name);
             return res.status(400).json({ error: 'Organización no tiene base de datos configurada.' });
         }
 

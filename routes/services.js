@@ -4,10 +4,19 @@ import { auth } from '../middleware/auth.js';
 
 const router = express.Router();
 
-// Specific handlers that substitute n8n
-router.get('/execute/facturas-sat', auth, serviceController.getFacturasSat);
+// Logging middleware for debugging (Solo para desarrollo/debug)
+router.use('/execute/:serviceId', (req, res, next) => {
+    console.log(`[DEBUG] Request for service: ${req.params.serviceId} | Method: ${req.method} | Path: ${req.path}`);
+    next();
+});
 
-// Generic route that proxies services based on serviceId
+// 1. Handlers específicos (DEBEN IR PRIMERO)
+router.get('/execute/facturas-sat', auth, (req, res, next) => {
+    console.log('[DEBUG] Matched specific route: /execute/facturas-sat');
+    serviceController.getFacturasSat(req, res, next);
+});
+
+// 2. Rutas genéricas
 router.post('/execute/:serviceId', auth, serviceController.proxyService);
 router.get('/execute/:serviceId', auth, serviceController.proxyService);
 
