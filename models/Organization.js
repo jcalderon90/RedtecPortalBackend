@@ -16,6 +16,12 @@ const OrganizationSchema = new mongoose.Schema({
     activeServices: [{
         type: String // e.g., 'applications', 'invoices', 'video-analysis'
     }],
+    databaseConfig: {
+        mongoUri: {
+            type: String,
+            trim: true
+        }
+    },
     settings: {
         type: Map,
         of: mongoose.Schema.Types.Mixed,

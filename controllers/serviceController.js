@@ -2,6 +2,8 @@ import axios from 'axios';
 import mongoose from 'mongoose';
 import History from '../models/History.js';
 import Service from '../models/Service.js';
+import FacturaSchema from '../models/Factura.js';
+import { getDynamicModel } from '../utils/connectionManager.js';
 
 export const proxyService = async (req, res) => {
     const { serviceId } = req.params;
@@ -88,6 +90,84 @@ export const getUserServices = async (req, res) => {
         res.json({ services_list: services });
     } catch (error) {
         console.error('Error in getUserServices:', error);
+        res.status(500).json({ error: error.message });
+    }
+};
+
+export const getHistory = async (req, res) => {
+    try {
+        const { serviceId } = req.params;
+        const { organization } = req.user;
+
+        const history = await History.find({ 
+            serviceId, 
+            organization: organization._id 
+        })
+        .populate('user', 'firstName lastName email')
+        .sort({ createdAt: -1 })
+        .limit(50);
+
+        res.json(history);
+    } catch (error) {
+        console.error('Error in getHistory:', error);
+        res.status(500).json({ error: error.message });
+    }
+};
+
+export const getFacturasSat = async (req, res) => {
+    try {
+        const { organization } = req.user;
+        const mongoUri = organization?.databaseConfig?.mongoUri;
+
+        if (!mongoUri) {
+            return res.status(400).json({ error: 'Organización no tiene base de datos configurada.' });
+        }
+
+        const query = req.query;
+        const page = parseInt(query.page) || 1;
+        const limit = parseInt(query.pageSize) || 10;
+        const skip = (page - 1) * limit;
+
+        const filter = {};
+
+        // Réplica exacta de la lógica de n8n "FILTERS"
+        if (query.emisor) {
+            filter.emisor_nombre = { "$regex": query.emisor, "$options": "i" };
+        }
+        if (query.nit) {
+            filter.emisor_nit = { "$regex": query.nit, "$options": "i" };
+        }
+        
+        // Filtro de Fechas (Formato ISO String manual como en n8n)
+        if (query.from || query.to) {
+            filter.fecha_emision = {};
+            if (query.from) filter.fecha_emision.$gte = query.from + "T00:00:00.000";
+            if (query.to) filter.fecha_emision.$lte = query.to + "T23:59:59.999";
+        }
+
+        if (query.serie) filter.serie = { "$regex": query.serie, "$options": "i" };
+        if (query.dte) filter.numero_dte = { "$regex": query.dte, "$options": "i" };
+        if (query.monto) filter.monto_total = parseFloat(query.monto);
+
+        // Obtener el modelo dinámico vinculado a la conexión de la empresa
+        const Factura = await getDynamicModel(mongoUri, 'Factura', FacturaSchema);
+
+        // Ejecución de consultas
+        const [facturas, total] = await Promise.all([
+            Factura.find(filter).sort({ fecha_emision: -1 }).skip(skip).limit(limit),
+            Factura.countDocuments(filter)
+        ]);
+
+        res.json({
+            data: facturas,
+            meta: {
+                total,
+                page,
+                totalPages: Math.ceil(total / limit) || 1
+            }
+        });
+    } catch (error) {
+        console.error('Error in getFacturasSat:', error);
         res.status(500).json({ error: error.message });
     }
 };

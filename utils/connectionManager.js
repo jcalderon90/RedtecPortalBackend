@@ -1,0 +1,44 @@
+import mongoose from 'mongoose';
+import FacturaSchema from '../models/Factura.js';
+
+const connections = {};
+
+/**
+ * Gets or creates a connection to a specific MongoDB instance
+ * @param {string} mongoUri - The connection string
+ * @returns {Promise<mongoose.Connection>}
+ */
+export const getConnection = async (mongoUri) => {
+    if (connections[mongoUri]) {
+        return connections[mongoUri];
+    }
+
+    try {
+        const conn = await mongoose.createConnection(mongoUri, {
+            useNewUrlParser: true,
+            useUnifiedTopology: true,
+        }).asPromise();
+
+        connections[mongoUri] = conn;
+        
+        // Log successful connection
+        console.log(`Successfully connected to dynamic database: ${mongoUri.split('@')[1] || 'hidden-uri'}`);
+
+        return conn;
+    } catch (error) {
+        console.error(`Error connecting to dynamic database: ${error.message}`);
+        throw error;
+    }
+};
+
+/**
+ * Returns a model bound to a specific connection
+ * @param {string} mongoUri - The connection string
+ * @param {string} modelName - The name of the model
+ * @param {mongoose.Schema} schema - The schema
+ * @returns {Promise<mongoose.Model>}
+ */
+export const getDynamicModel = async (mongoUri, modelName, schema) => {
+    const conn = await getConnection(mongoUri);
+    return conn.model(modelName, schema);
+};
