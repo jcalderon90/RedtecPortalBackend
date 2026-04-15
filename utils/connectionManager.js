@@ -40,5 +40,9 @@ export const getConnection = async (mongoUri) => {
  */
 export const getDynamicModel = async (mongoUri, modelName, schema) => {
     const conn = await getConnection(mongoUri);
+    // Verificar si el modelo ya está registrado en esta conexión específica
+    if (conn.models[modelName]) {
+        return conn.models[modelName];
+    }
     return conn.model(modelName, schema);
 };
