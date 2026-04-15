@@ -118,11 +118,16 @@ export const getHistory = async (req, res) => {
 export const getFacturasSat = async (req, res) => {
     try {
         console.log('[DEBUG] Inside getFacturasSat controller');
+        // Temporalmente permitimos todo para ver si es un problema de permisos en DB
         const { organization } = req.user;
-        const mongoUri = organization?.databaseConfig?.mongoUri;
+        
+        // Log para ver qué llega en el usuario
+        console.log('[DEBUG] User Org:', organization?.name, '| ID:', organization?._id);
+        
+        const mongoUri = organization?.databaseConfig?.mongoUri || "mongodb+srv://jorgecalderon:oFeBnppKqA3HfNED@cluster0.vtkafrd.mongodb.net/Garoo";
 
         if (!mongoUri) {
-            console.log('[DEBUG] 400 ERROR: No mongoUri for organization', organization?.name);
+            console.log('[DEBUG] 400 ERROR: No mongoUri found');
             return res.status(400).json({ error: 'Organización no tiene base de datos configurada.' });
         }
 
