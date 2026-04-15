@@ -42,11 +42,13 @@ app.use('/api/services', serviceRoutes);
 app.use('/api/admin', adminRoutes);
 
 app.get('/', (req, res) => {
+    console.log('[DEBUG] Root path hit');
     res.json({ message: 'Garoo Services API is running' });
 });
 
 // Health check
 app.get('/health', (req, res) => {
+    console.log('[DEBUG] Health check hit');
     res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
