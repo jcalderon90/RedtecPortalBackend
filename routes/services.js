@@ -24,7 +24,10 @@ router.post('/execute-public/:serviceId', serviceController.proxyService);
 // Get authorized services for the current user's organization
 router.get('/my-services', auth, serviceController.getUserServices);
 
-// Get execution history for a service
+// Get history
 router.get('/history/:serviceId', auth, serviceController.getHistory);
+
+// Get users of an organization (for filters)
+router.get('/org-users/:orgSlug', auth, serviceController.getOrgUsers);
 
 export default router;
