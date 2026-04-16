@@ -309,9 +309,15 @@ export const getOrgUsers = async (req, res) => {
 
         // 2. Seguridad: Permitir si es Admin O si pertenece a esa org
         const isAdmin = (user?.role || '').toLowerCase() === 'admin';
-        const belongsToOrg = user?.organization?.toString() === org._id.toString();
+        
+        // Extraer ID de la organización del usuario (puede venir como objeto o string)
+        const userOrgId = user?.organization?._id?.toString() || user?.organization?.toString();
+        const targetOrgId = org._id.toString();
+
+        const belongsToOrg = userOrgId === targetOrgId;
 
         if (!isAdmin && !belongsToOrg) {
+            console.log(`[DEBUG] 403 Rejected OrgUsers: UserOrg(${userOrgId}) !== TargetOrg(${targetOrgId})`);
             return res.status(403).json({ error: 'No tienes permisos para ver usuarios de esta organización' });
         }
 
