@@ -267,8 +267,8 @@ export const getFacturasSat = async (req, res) => {
             },
             {
                 $addFields: {
-                    matched: { $cond: { if: { $gt: [{ $size: "$form_info" }, 0] }, then: { $ifNull: ["$formDoc.matched", false] }, else: { $ifNull: ["$matched", false] } } },
-                    confirmed: { $cond: { if: { $gt: [{ $size: "$form_info" }, 0] }, then: { $ifNull: ["$formDoc.confirmed", false] }, else: { $ifNull: ["$confirmed", false] } } }
+                    calculatedMatched: { $cond: { if: { $gt: [{ $size: "$form_info" }, 0] }, then: { $ifNull: ["$formDoc.matched", false] }, else: { $ifNull: ["$matched", false] } } },
+                    calculatedConfirmed: { $cond: { if: { $gt: [{ $size: "$form_info" }, 0] }, then: { $ifNull: ["$formDoc.confirmed", false] }, else: { $ifNull: ["$confirmed", false] } } }
                 }
             }
         ];
@@ -280,17 +280,17 @@ export const getFacturasSat = async (req, res) => {
 
         if (query.matched !== undefined && query.matched !== "") {
             if (isTrue(query.matched)) {
-                pipeline.push({ $match: { matched: true } });
+                pipeline.push({ $match: { calculatedMatched: true } });
             } else if (isFalse(query.matched)) {
-                pipeline.push({ $match: { matched: false } });
+                pipeline.push({ $match: { calculatedMatched: false } });
             }
         }
 
         if (query.confirmed !== undefined && query.confirmed !== "") {
             if (isTrue(query.confirmed)) {
-                pipeline.push({ $match: { confirmed: true } });
+                pipeline.push({ $match: { calculatedConfirmed: true } });
             } else if (isFalse(query.confirmed)) {
-                pipeline.push({ $match: { confirmed: false } });
+                pipeline.push({ $match: { calculatedConfirmed: false } });
             }
         }
 
@@ -347,11 +347,14 @@ export const getFacturasSat = async (req, res) => {
                         return histNit === inv.emisor_nit && histSerie === inv.serie;
                     });
 
+                    // Sobrescribir matched/confirmed con los calculados para no cambiar el frontend
                     return {
                         ...inv,
-                        portal_user: submission?.user ? 
+                        matched: inv.calculatedMatched,
+                        confirmed: inv.calculatedConfirmed,
+                        portal_user: userName || (submission?.user ? 
                             `${submission.user.firstName || ''} ${submission.user.lastName || ''}`.trim() : 
-                            null
+                            null)
                     };
                 });
             }
