@@ -296,4 +296,35 @@ export const getFacturasSat = async (req, res) => {
     }
 };
 
+export const getOrgUsers = async (req, res) => {
+    try {
+        const { orgSlug } = req.params;
+        const user = req.user;
+
+        // 1. Obtener la organización por slug
+        const Organization = mongoose.model('Organization');
+        const org = await Organization.findOne({ slug: orgSlug });
+        
+        if (!org) return res.status(404).json({ error: 'Organización no encontrada' });
+
+        // 2. Seguridad: Permitir si es Admin O si pertenece a esa org
+        const isAdmin = (user?.role || '').toLowerCase() === 'admin';
+        const belongsToOrg = user?.organization?.toString() === org._id.toString();
+
+        if (!isAdmin && !belongsToOrg) {
+            return res.status(403).json({ error: 'No tienes permisos para ver usuarios de esta organización' });
+        }
+
+        // 3. Obtener usuarios (solo campos necesarios)
+        const User = mongoose.model('User');
+        const users = await User.find({ organization: org._id })
+            .select('firstName lastName email')
+            .sort({ firstName: 1 });
+
+        res.json(users);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+};
+
 
