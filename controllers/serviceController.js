@@ -117,18 +117,35 @@ export const getHistory = async (req, res) => {
 
 export const getFacturasSat = async (req, res) => {
     try {
-        const { organization } = req.user;
+        const { organization, role } = req.user;
+        const isAdmin = (role || '').toLowerCase() === 'admin';
         
-        console.log('[facturas-sat] Org:', organization?.name, '| ID:', organization?._id);
+        console.log(`[facturas-sat] User org: ${organization?.name} | Role: ${role} | Admin: ${isAdmin}`);
 
-        // ── Verificar que la organización tiene DB propia configurada ──
-        const mongoUri = organization?.databaseConfig?.mongoUri;
+        let targetMongoUri = organization?.databaseConfig?.mongoUri;
 
-        if (!mongoUri) {
-            console.warn(`[facturas-sat] ⚠️  Org "${organization?.name}" no tiene databaseConfig.mongoUri configurado.`);
+        // Si es admin y pasa un orgSlug específico, buscar esa org en la DB
+        if (isAdmin && req.query.orgSlug) {
+            const Organization = mongoose.model('Organization');
+            const targetOrg = await Organization.findOne({ slug: req.query.orgSlug }).lean();
+
+            if (!targetOrg) {
+                return res.status(404).json({
+                    error: 'org_not_found',
+                    message: `No se encontró la organización con slug: "${req.query.orgSlug}"`
+                });
+            }
+
+            targetMongoUri = targetOrg.databaseConfig?.mongoUri;
+            console.log(`[facturas-sat] Admin targeting org: ${targetOrg.name} (${req.query.orgSlug})`);
+        }
+
+        if (!targetMongoUri) {
+            const orgName = req.query.orgSlug || organization?.name || 'desconocida';
+            console.warn(`[facturas-sat] ⚠️  Org "${orgName}" no tiene databaseConfig.mongoUri configurado.`);
             return res.status(400).json({
                 error: 'db_not_configured',
-                message: `La organización "${organization?.name || 'desconocida'}" no tiene una base de datos configurada. Contacta al administrador.`
+                message: `La organización "${orgName}" no tiene una base de datos configurada. Contacta al administrador.`
             });
         }
 
@@ -161,9 +178,8 @@ export const getFacturasSat = async (req, res) => {
         // Obtener el modelo dinámico vinculado a la conexión de la empresa
         let Factura;
         try {
-            Factura = await getDynamicModel(mongoUri, 'Factura', FacturaSchema);
+            Factura = await getDynamicModel(targetMongoUri, 'Factura', FacturaSchema);
         } catch (connErr) {
-            // Separar error de conexión del resto
             const isNetworkError = connErr.message?.includes('ENOTFOUND') ||
                                    connErr.message?.includes('ETIMEDOUT') ||
                                    connErr.message?.includes('connect ECONNREFUSED');
@@ -201,3 +217,5 @@ export const getFacturasSat = async (req, res) => {
         });
     }
 };
+
+
