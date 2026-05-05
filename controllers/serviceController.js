@@ -13,12 +13,18 @@ export const proxyService = async (req, res) => {
     const isAdmin = (user?.role || '').toLowerCase() === 'admin';
 
     if (!isAdmin && user && organization) {
-        if (!organization.activeServices.includes(serviceId)) {
-            console.log(`[DEBUG] 403 REJECTED: Service ${serviceId} not in [${organization.activeServices}]`);
+        // Normalización de IDs: n8n usa 'facturas' pero la DB suele tener 'facturacion'
+        const checkId = serviceId === 'facturas' ? 'facturacion' : serviceId;
+        
+        const hasOrgAccess = organization.activeServices.includes(serviceId) || organization.activeServices.includes(checkId);
+        if (!hasOrgAccess) {
+            console.log(`[DEBUG] 403 REJECTED: Service ${serviceId}/${checkId} not in [${organization.activeServices}]`);
             return res.status(403).json({ error: `Service '${serviceId}' not active for your organization.` });
         }
-        if (!user.allowedServices?.includes(serviceId)) {
-            console.log(`[DEBUG] 403 REJECTED: Service ${serviceId} not in user allowedServices [${user.allowedServices}]`);
+
+        const hasUserAccess = user.allowedServices?.includes(serviceId) || user.allowedServices?.includes(checkId);
+        if (!hasUserAccess) {
+            console.log(`[DEBUG] 403 REJECTED: Service ${serviceId}/${checkId} not in user allowedServices [${user.allowedServices}]`);
             return res.status(403).json({ error: `Service '${serviceId}' not allowed for your user account.` });
         }
     }
@@ -369,7 +375,7 @@ export const getFacturasSat = async (req, res) => {
             if (orgId) {
                 const recentHistory = await History.find({
                     organization: orgId,
-                    serviceId: 'facturas', // El ID del formulario de envío
+                    serviceId: 'facturacion', // El ID del formulario de envío
                     status: 'success'
                 })
                 .populate('user', 'firstName lastName')
