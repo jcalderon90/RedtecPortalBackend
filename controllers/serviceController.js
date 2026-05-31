@@ -4,7 +4,7 @@ import History from '../models/History.js';
 import Service from '../models/Service.js';
 import FacturaSchema from '../models/Factura.js';
 import LeadSchema from '../models/Lead.js';
-import { getDynamicModel } from '../utils/connectionManager.js';
+import { getDynamicModel, getConnection } from '../utils/connectionManager.js';
 
 export const proxyService = async (req, res) => {
     const { serviceId } = req.params;
@@ -644,6 +644,142 @@ export const getSpectrumLeads = async (req, res) => {
         });
     } catch (error) {
         console.error('[spectrum-leads] ❌ Error inesperado:', error.message);
+        res.status(500).json({ error: 'unexpected_error', message: error.message });
+    }
+};
+
+const PROJECT_NAMES = {
+    PVV: 'Parque Vista Verde',
+    PMAR: 'Parque Mariscal',
+    PPO: 'Parque Portales',
+    PPOL: 'Polanco Parque Boutique',
+    PSB: 'Parque Sotobosque',
+};
+const KNOWN_PROJECTS = ['PVV', 'PMAR', 'PPO', 'PPOL', 'PSB'];
+
+export const getSpectrumDashboard = async (req, res) => {
+    try {
+        const { organization, role, allowedServices } = req.user;
+        const isAdmin = (role || '').toLowerCase() === 'admin';
+
+        if (!isAdmin) {
+            const hasOrgAccess = organization?.activeServices?.includes('spectrum-leads');
+            const hasUserAccess = allowedServices?.includes('spectrum-leads');
+            if (!hasOrgAccess) return res.status(403).json({ error: "Service not active for your organization." });
+            if (!hasUserAccess) return res.status(403).json({ error: "Service not allowed for your user account." });
+        }
+
+        let targetMongoUri = organization?.databaseConfig?.mongoUri;
+        if (isAdmin && req.query.orgSlug) {
+            const Organization = mongoose.model('Organization');
+            const targetOrg = await Organization.findOne({ slug: req.query.orgSlug }).lean();
+            if (!targetOrg) return res.status(404).json({ error: 'org_not_found', message: `No se encontró la organización: "${req.query.orgSlug}"` });
+            targetMongoUri = targetOrg.databaseConfig?.mongoUri;
+        }
+
+        if (!targetMongoUri) return res.status(400).json({ error: 'db_not_configured', message: 'La organización no tiene base de datos configurada.' });
+
+        const conn = await getConnection(targetMongoUri);
+
+        const { from, to } = req.query;
+        const buildDateFilter = (field) => {
+            if (!from && !to) return {};
+            const cond = {};
+            if (from) cond.$gte = new Date(from);
+            if (to) cond.$lte = new Date(`${to}T23:59:59`);
+            return { [field]: cond };
+        };
+
+        const [
+            fase1ByProject,
+            fase2ByProject,
+            channelDist,
+            appointmentsByProject,
+            totalFase1,
+            totalFase2,
+        ] = await Promise.all([
+            conn.collection('users').aggregate([
+                { $match: buildDateFilter('last_interaction') },
+                { $group: { _id: '$proyecto', count: { $sum: 1 } } },
+            ]).toArray(),
+
+            conn.collection('users_fase_2').aggregate([
+                { $match: buildDateFilter('timestamp') },
+                { $group: { _id: '$proyecto', count: { $sum: 1 } } },
+            ]).toArray(),
+
+            conn.collection('users').aggregate([
+                { $match: buildDateFilter('last_interaction') },
+                { $group: { _id: '$input_channel', count: { $sum: 1 } } },
+            ]).toArray(),
+
+            conn.collection('appointments').aggregate([
+                { $match: buildDateFilter('created_at') },
+                { $group: { _id: { $ifNull: ['$project', '$proyecto'] }, count: { $sum: 1 } } },
+            ]).toArray(),
+
+            conn.collection('users').countDocuments(buildDateFilter('last_interaction')),
+            conn.collection('users_fase_2').countDocuments(buildDateFilter('timestamp')),
+        ]);
+
+        const fase1Map = Object.fromEntries(fase1ByProject.map(r => [r._id, r.count]));
+        const fase2Map = Object.fromEntries(fase2ByProject.map(r => [r._id, r.count]));
+        const citasMap = Object.fromEntries(appointmentsByProject.map(r => [r._id, r.count]));
+        const totalLeads = totalFase1 + totalFase2;
+
+        const allProjectKeys = new Set([
+            ...KNOWN_PROJECTS,
+            ...Object.keys(fase1Map),
+            ...Object.keys(fase2Map),
+        ]);
+
+        const by_project = [...allProjectKeys]
+            .filter(k => k && k !== 'null' && k !== 'undefined')
+            .sort((a, b) => {
+                const ai = KNOWN_PROJECTS.indexOf(a);
+                const bi = KNOWN_PROJECTS.indexOf(b);
+                if (ai === -1 && bi === -1) return a.localeCompare(b);
+                if (ai === -1) return 1;
+                if (bi === -1) return -1;
+                return ai - bi;
+            })
+            .map(key => {
+                const leads = (fase1Map[key] || 0) + (fase2Map[key] || 0);
+                const citas = citasMap[key] || 0;
+                return {
+                    proyecto: key,
+                    nombre: PROJECT_NAMES[key] || key,
+                    fase1: fase1Map[key] || 0,
+                    fase2: fase2Map[key] || 0,
+                    leads,
+                    leads_pct: totalLeads > 0 ? +((leads / totalLeads) * 100).toFixed(1) : 0,
+                    citas,
+                    citas_pct: leads > 0 ? +((citas / leads) * 100).toFixed(1) : 0,
+                };
+            });
+
+        const by_channel = {};
+        channelDist.forEach(r => {
+            const ch = normalizeChannel(r._id);
+            by_channel[ch] = (by_channel[ch] || 0) + r.count;
+        });
+
+        const totalCitas = appointmentsByProject.reduce((s, r) => s + r.count, 0);
+
+        console.log(`[spectrum-dashboard] ✅ ${totalLeads} leads, ${totalCitas} citas`);
+        res.json({
+            summary: {
+                total_leads: totalLeads,
+                total_fase1: totalFase1,
+                total_fase2: totalFase2,
+                total_citas: totalCitas,
+                conversion_rate: totalLeads > 0 ? +((totalCitas / totalLeads) * 100).toFixed(1) : 0,
+            },
+            by_project,
+            by_channel,
+        });
+    } catch (error) {
+        console.error('[spectrum-dashboard] ❌ Error:', error.message);
         res.status(500).json({ error: 'unexpected_error', message: error.message });
     }
 };

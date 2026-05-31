@@ -16,6 +16,7 @@ router.use('/execute/:serviceId', (req, res, next) => {
 router.get('/execute/facturas-sat', auth, validate(serviceSchemas.facturasSatQuerySchema), serviceController.getFacturasSat);
 router.get('/integrated/facturas-sat', auth, validate(serviceSchemas.facturasSatQuerySchema), serviceController.getFacturasSat);
 router.get('/execute/spectrum-leads', auth, validate(serviceSchemas.spectrumLeadsQuerySchema), serviceController.getSpectrumLeads);
+router.get('/execute/spectrum-dashboard', auth, validate(serviceSchemas.spectrumDashboardQuerySchema), serviceController.getSpectrumDashboard);
 
 // 4. RUTAS GENÉRICAS
 router.post('/execute/:serviceId', auth, validate(serviceSchemas.proxyServiceSchema), serviceController.proxyService);

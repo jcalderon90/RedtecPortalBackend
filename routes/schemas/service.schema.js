@@ -34,6 +34,14 @@ export const spectrumLeadsQuerySchema = z.object({
     }),
 });
 
+export const spectrumDashboardQuerySchema = z.object({
+    query: z.object({
+        orgSlug: z.string().optional(),
+        from: z.string().optional(),
+        to: z.string().optional(),
+    }),
+});
+
 // Nota: El proxyService (/:serviceId) pasa toda la carga al webhook de n8n.
 // Se valida levemente el param para evitar exploits como strings vacíos.
 export const proxyServiceSchema = z.object({
