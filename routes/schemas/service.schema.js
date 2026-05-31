@@ -26,6 +26,7 @@ export const spectrumLeadsQuerySchema = z.object({
     query: z.object({
         page: z.string().optional(),
         pageSize: z.string().optional(),
+        orgSlug: z.string().optional(),
         search: z.string().optional(),
         channel: z.string().optional(),
         emotion: z.string().optional(),

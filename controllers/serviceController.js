@@ -524,11 +524,27 @@ export const getSpectrumLeads = async (req, res) => {
             }
         }
 
-        const targetMongoUri = organization?.databaseConfig?.mongoUri;
+        let targetMongoUri = organization?.databaseConfig?.mongoUri;
+
+        if (isAdmin && req.query.orgSlug) {
+            const Organization = mongoose.model('Organization');
+            const targetOrg = await Organization.findOne({ slug: req.query.orgSlug }).lean();
+            if (!targetOrg) {
+                return res.status(404).json({
+                    error: 'org_not_found',
+                    message: `No se encontró la organización con slug: "${req.query.orgSlug}"`
+                });
+            }
+            targetMongoUri = targetOrg.databaseConfig?.mongoUri;
+            console.log(`[spectrum-leads] Admin targeting org: ${targetOrg.name} (${req.query.orgSlug})`);
+        }
+
+        console.log(`[spectrum-leads] User org: ${organization?.name} | Role: ${role} | URI configured: ${!!targetMongoUri}`);
+
         if (!targetMongoUri) {
             return res.status(400).json({
                 error: 'db_not_configured',
-                message: `La organización "${organization?.name}" no tiene base de datos configurada.`
+                message: `La organización "${req.query.orgSlug || organization?.name}" no tiene base de datos configurada.`
             });
         }
 
