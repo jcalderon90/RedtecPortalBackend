@@ -4,8 +4,7 @@
  */
 import mongoose from 'mongoose';
 
-// Hosts resueltos del SRV record (Node.js no puede hacer querySrv en este entorno)
-const SPECTRUM_URI = "mongodb://jorgecalderon_db_user:hvV2fwG1dGcWVuAT@ac-gj52igi-shard-00-00.es7z0bi.mongodb.net:27017,ac-gj52igi-shard-00-01.es7z0bi.mongodb.net:27017,ac-gj52igi-shard-00-02.es7z0bi.mongodb.net:27017/Centralizado?ssl=true&authSource=admin&replicaSet=atlas-sfsy1w-shard-0";
+const SPECTRUM_URI = "mongodb+srv://jorgecalderon_db_user:hvV2fwG1dGcWVuAT@cluster0.es7z0bi.mongodb.net/Centralizado";
 
 async function main() {
     console.log('\n🔗 Conectando a Centralizado (Spectrum)...');
