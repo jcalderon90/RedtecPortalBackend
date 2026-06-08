@@ -112,7 +112,7 @@ export const getDashboard = async (req, res) => {
         const dateFilter = {};
         if (from) dateFilter.$gte = from;
         if (to)   dateFilter.$lte = to + 'T99';
-        const match = Object.keys(dateFilter).length ? { last_interaction: dateFilter } : {};
+        const match = Object.keys(dateFilter).length ? { first_interaction: dateFilter } : {};
 
         const [summary, byProject, byChannelRaw, projectNames] = await Promise.all([
             Lead.aggregate([
